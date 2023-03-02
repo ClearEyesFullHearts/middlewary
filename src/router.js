@@ -1,78 +1,21 @@
 const flatten = require('array-flatten');
-const pathRegexp = require('path-to-regexp');
 const debug = require('debug')('middlewary:router');
 const Layer = require('./layer');
 
 const { slice } = Array.prototype;
 
 class Router extends Layer {
-  constructor(name, opts = {
+  constructor(opts = {
     sensitive: true,
     strict: true,
     delimiter: '.',
+    trimLeft: false,
   }) {
-    super();
+    super(opts);
 
     this.options = opts;
-    this.name = name || '*';
-    this.keys = [];
-    this.params = undefined;
-    this.path = undefined;
     this.parent = undefined;
-    this.regexp = pathRegexp(name, this.keys, opts);
-
-    // set fast path flags
-    this.regexp.fast_star = name === '*';
-
-    this.matchPath = (path) => {
-      let match = false;
-
-      if (path != null) {
-        // fast path for * (everything matched in a param)
-        if (this.regexp.fast_star) {
-          this.params = { 0: this.decode_param(path) };
-          this.path = path;
-          return true;
-        }
-
-        // match the path
-        match = this.regexp.exec(path);
-      }
-
-      if (!match) {
-        this.params = undefined;
-        this.path = undefined;
-        return false;
-      }
-
-      // store values
-      this.params = {};
-      const [matchPath] = match;
-      this.path = matchPath;
-
-      const { keys } = this;
-      const { params } = this;
-
-      for (let i = 1; i < match.length; i += 1) {
-        const key = keys[i - 1];
-        const prop = key.name;
-        const val = this.decode_param(match[i]);
-
-        if (val !== undefined || !(hasOwnProperty.call(params, prop))) {
-          params[prop] = val;
-        }
-      }
-
-      return true;
-    };
-
-    this.decode_param = (val) => {
-      if (typeof val !== 'string' || val.length === 0) {
-        return val;
-      }
-
-      return decodeURIComponent(val);
-    };
+    this.route = '.';
 
     this.restore = (fn, obj, ...args) => {
       const props = new Array(args.length);
@@ -94,7 +37,6 @@ class Router extends Layer {
 
     this.getnext = (done, ...args) => {
       let idx = 0;
-      const handlerName = this.name;
 
       // middleware and routes
       const { stack } = this;
@@ -112,7 +54,7 @@ class Router extends Layer {
 
         // no more matching layers
         if (idx >= stack.length) {
-          debug(`Router ${handlerName} stack is done`);
+          debug('Router\'s stack is done');
           setImmediate(done, layerError);
           return;
         }
@@ -124,14 +66,50 @@ class Router extends Layer {
         const handleArgs = [...args, next];
 
         if (layerError) {
-          debug('have error for ', layer.name);
+          debug(`layer ${idx} of ${stack.length} handles error`);
           layer.handleError(layerError, ...handleArgs);
           return;
         }
 
+        debug(`layer ${idx} of ${stack.length} handles request`);
         layer.handle(...handleArgs);
       }
       return next;
+    };
+
+    this.trim = (str) => {
+      const ch = this.options.delimiter;
+      const both = this.options.trimLeft;
+      let start = 0;
+      let end = str.length;
+
+      if (end < 2) return str;
+
+      while (start < end && str[start] === ch) { start += 1; }
+
+      while (end > start && str[end - 1] === ch) { end -= 1; }
+
+      if (both) {
+        return (start > 0 || end < str.length) ? str.substring(start, end) : str;
+      }
+      return (end < str.length) ? str.substring(0, end) : str;
+    };
+
+    this.getLayerPath = () => {
+      const myPath = this.route;
+      if (this.parent instanceof Router) {
+        const parentPath = this.parent.getLayerPath();
+        if (parentPath && parentPath !== this.options.delimiter) {
+          if (myPath) {
+            return this.trim(`${parentPath}${this.options.delimiter}${myPath}`);
+          }
+          return this.trim(parentPath);
+        }
+      }
+      if (myPath) {
+        return this.trim(myPath);
+      }
+      return '';
     };
   }
 
@@ -141,9 +119,11 @@ class Router extends Layer {
 
     if (Object.prototype.toString.call(first) === '[object String]') {
       // add new router
-      const subRouter = new Router(first, this.options);
-      subRouter.use(fns);
+      debug(`Router creates a new router for route: ${first}`);
+      const subRouter = new Router(this.options);
+      subRouter.route = first;
       subRouter.parent = this;
+      subRouter.use(fns);
       this.stack.push(subRouter);
       return;
     }
@@ -151,43 +131,53 @@ class Router extends Layer {
     for (let i = 0; i < handles.length; i += 1) {
       const handle = handles[i];
       if (handle instanceof Router) {
+        debug(`Router adds a router for route: ${first}`);
         handle.parent = this;
+        handle.mount();
         this.stack.push(handle);
       } else if (handle instanceof Layer) {
+        debug('Router adds a layer');
+        handle.path = this.getLayerPath();
         this.stack.push(handle);
       } else {
-        const layer = new Layer();
+        debug('Router creates a new layer');
+        const layer = new Layer(this.options);
+        layer.path = this.getLayerPath();
         layer.use(handle);
         this.stack.push(layer);
       }
     }
   }
 
-  handle(...args) {
-    const handlerName = this.name;
-    const [first] = args;
-    const out = args[args.length - 1];
-
-    if (this.matchPath(first.path)) {
-      first.params = this.params;
-
-      const done = this.restore(out, first, 'next');
-
-      const next = this.getnext(done, ...args);
-
-      first.next = next;
-
-      debug(`Handler ${handlerName} begins`);
-      next();
-      return;
-    }
-
-    setImmediate(out, null);
+  mount() {
+    debug('Router mounts its stack to its parent router');
+    this.stack.forEach((layer) => {
+      if (layer instanceof Router) {
+        layer.mount();
+      } else if (layer instanceof Layer) {
+        layer.path = this.getLayerPath(); // eslint-disable-line no-param-reassign
+      }
+    });
   }
 
-  handleError(err, ...args) {
+  handle(...args) {
+    const [first] = args;
+    const out = args.pop();
+
+    const done = this.restore(out, first, 'next');
+
+    const next = this.getnext(done, ...args);
+
+    first.next = next;
+
+    debug('Router begins handling cycle');
+    next();
+  }
+
+  handleError(err, ...args) { // eslint-disable-line class-methods-use-this
     // A router shouldn't propagate to its stack an error coming from outside
     // Just send it back to the parent router stack.
+    debug('Router do not handle errors directly');
     const out = args[args.length - 1];
     setImmediate(out, err);
   }
