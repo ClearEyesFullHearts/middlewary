@@ -6,6 +6,9 @@
   "scripts": {
     "test": "set DEBUG=middlewary:*&& jest"
   },
+  "jest": {
+    "collectCoverage": true
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ClearEyesFullHearts/middlewary.git"

@@ -131,7 +131,7 @@ class Router extends Layer {
     for (let i = 0; i < handles.length; i += 1) {
       const handle = handles[i];
       if (handle instanceof Router) {
-        debug(`Router adds a router for route: ${first}`);
+        debug('Router adds a router');
         handle.parent = this;
         handle.mount();
         this.stack.push(handle);

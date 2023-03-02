@@ -92,7 +92,7 @@ class Layer {
 
   handle(...args) {
     if (args.length < 2) {
-      throw new Error('Middlewares should have at least 2 arguments');
+      throw new Error('Requests should have at least 2 arguments');
     }
     const [fn] = this.stack;
     const [first] = args;
@@ -121,6 +121,9 @@ class Layer {
   }
 
   handleError(...args) {
+    if (args.length < 3) {
+      throw new Error('Error requests should have at least 3 arguments');
+    }
     const [fn] = this.stack;
     const [err, first] = args;
     const next = args[args.length - 1];

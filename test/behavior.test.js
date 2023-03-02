@@ -3,11 +3,7 @@ const {
 } = require('@jest/globals');
 
 const Router = require('../src/router');
-
-const middlewareFactory = (val) => (req, res, next) => {
-  res.result.push(val);
-  next();
-};
+const { middlewareFactory } = require('./fixtures');
 
 describe('Behavior tests', () => {
   test('Routers can be added and responds', (done) => {
@@ -20,6 +16,7 @@ describe('Behavior tests', () => {
        -> l3
        -> R4 -> l4-0
              -> l4-1
+             -> R5 -> l5-0
     */
     const zero = new Router();
     zero.route = 'hello';
@@ -45,6 +42,11 @@ describe('Behavior tests', () => {
     lvl4.use([lvl40Handle, lvl41Handle]);
     zero.use('world', lvl4);
 
+    const lvl5 = new Router();
+    const lvl50Handle = middlewareFactory('5-0');
+    lvl5.use(lvl50Handle);
+    lvl4.use('best', lvl5);
+
     const mockReq = { path: 'hello' };
     const mockRes = { result: [] };
     zero.handle(mockReq, mockRes, () => {
@@ -53,17 +55,17 @@ describe('Behavior tests', () => {
       mockRes.result = [];
       zero.handle(mockReq, mockRes, () => {
         expect(mockRes.result).toEqual(['4-0', '4-1']);
-        mockReq.path = '*';
+        mockReq.path = 'hello.world.best';
         mockRes.result = [];
         zero.handle(mockReq, mockRes, () => {
-          expect(mockRes.result).toEqual([]);
+          expect(mockRes.result).toEqual(['5-0']);
           done();
         });
       });
     });
   });
 
-  test('undefined routes (the separator) should respond', (done) => {
+  test('Root routes should respond', (done) => {
     const zero = new Router();
     const lvl0Handle = middlewareFactory('0-0');
     zero.use(lvl0Handle);
@@ -84,8 +86,6 @@ describe('Behavior tests', () => {
     const mockRes = { result: [] };
     zero.handle(mockReq, mockRes, () => {
       expect(mockRes.result).toEqual(['0-0', '1-2', '0-1']);
-      // mockReq.path = 'hello.world';
-      // mockRes.result = [];
       done();
     });
   });
