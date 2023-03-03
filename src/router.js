@@ -5,18 +5,20 @@ const Layer = require('./layer');
 const { slice } = Array.prototype;
 
 class Router extends Layer {
-  constructor(opts = {
-    sensitive: true,
-    strict: true,
-    delimiter: '.',
-    RouterClass: Router,
-    LayerClass: Layer,
-  }) {
+  constructor(opts) {
     super(opts);
 
-    this.options = opts;
+    this.options = {
+      sensitive: true,
+      strict: true,
+      delimiter: '.',
+      RouterClass: Router,
+      LayerClass: Layer,
+      ...opts,
+    };
+
     this.parent = undefined;
-    this.route = opts.delimiter;
+    this.route = this.options.delimiter;
 
     this.restore = (fn, obj, ...args) => {
       const props = new Array(args.length);

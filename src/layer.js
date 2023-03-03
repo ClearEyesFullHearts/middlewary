@@ -13,14 +13,15 @@ class Layer {
     return this.internalPath;
   }
 
-  constructor(opts = {
-    sensitive: true,
-    strict: true,
-    delimiter: '.',
-  }) {
+  constructor(opts) {
     this.name = '<anonymous>';
 
-    this.options = opts;
+    this.options = {
+      sensitive: true,
+      strict: true,
+      delimiter: '.',
+      ...opts,
+    };
     this.keys = [];
     this.params = undefined;
     this.parent = undefined;
