@@ -96,10 +96,6 @@ describe('Behavior tests', () => {
 
   test('Routers should use inherited layers from options', (done) => {
     const options = {
-      sensitive: true,
-      strict: true,
-      delimiter: '.',
-      RouterClass: Router,
       LayerClass: GetMethodLayer,
     };
     const zero = new Router(options);
@@ -124,9 +120,6 @@ describe('Behavior tests', () => {
 
   test('Routers should use inherited routers from options', (done) => {
     const options = {
-      sensitive: true,
-      strict: true,
-      delimiter: '.',
       RouterClass: MethodRouter,
       LayerClass: Layer,
     };

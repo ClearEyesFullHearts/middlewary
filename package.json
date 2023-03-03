@@ -4,7 +4,8 @@
   "description": "utilies to add middleware functionalities to a project",
   "main": "index.js",
   "scripts": {
-    "test": "set DEBUG=middlewary:*&& jest"
+    "test": "jest",
+    "debug-test-win": "set DEBUG=middlewary:*&& jest"
   },
   "jest": {
     "collectCoverage": true

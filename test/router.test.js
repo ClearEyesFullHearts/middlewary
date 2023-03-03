@@ -72,6 +72,7 @@ describe('Router tests', () => {
     expect(router.stack[2]).toBeInstanceOf(Layer);
     expect(router.stack[2].name).toBe('funcOne');
   });
+
   test('Router uses routers and set layers\' paths', () => {
     const router = new Router();
     router.route = '.';
@@ -141,6 +142,41 @@ describe('Router tests', () => {
     expect(lvl2.getLayerPath()).toBe('house.sweet.home');
     expect(lvl3.getLayerPath()).toBe('house.sweet.home.alabama');
     expect(layer.path).toBe('house.sweet.home.alabama');
+  });
+  test('Router set correct layers\' paths', () => {
+    const router = new Router();
+    router.route = undefined;
+    const subrouter = new Router();
+    subrouter.route = '';
+    const lvl0 = new Router();
+    lvl0.route = '';
+    const lvl1 = new Router();
+    lvl1.route = '.sweet.';
+    const lvl2 = new Router();
+    lvl2.route = '';
+    const lvl3 = new Router();
+    lvl3.route = 'home';
+    const lvl4 = new Router();
+    lvl4.route = '.alabama.';
+    const funcOne = () => true;
+
+    router.use(subrouter);
+    subrouter.use(lvl0);
+    lvl0.use(lvl1);
+    lvl1.use(lvl2);
+    lvl2.use(lvl3);
+    lvl3.use(lvl4);
+    lvl4.use(funcOne);
+
+    expect(router.getLayerPath()).toBe('');
+    expect(subrouter.getLayerPath()).toBe('');
+    expect(lvl0.getLayerPath()).toBe('');
+    expect(lvl1.getLayerPath()).toBe('sweet');
+    expect(lvl2.getLayerPath()).toBe('sweet');
+    expect(lvl3.getLayerPath()).toBe('sweet.home');
+    expect(lvl4.getLayerPath()).toBe('sweet.home.alabama');
+    const [layer] = lvl4.stack;
+    expect(layer.path).toBe('sweet.home.alabama');
   });
 
   test('Router restores object', (done) => {
