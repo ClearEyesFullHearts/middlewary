@@ -1,9 +1,16 @@
 const {
   describe, expect, test,
 } = require('@jest/globals');
-
+const Layer = require('../src/layer');
 const Router = require('../src/router');
-const { middlewareFactory } = require('./fixtures');
+const {
+  middlewareFactory,
+  errorFactory,
+  catchFactory,
+  GetMethodLayer,
+  MethodRouter,
+  PostMethodLayer,
+} = require('./utils/fixtures');
 
 describe('Behavior tests', () => {
   test('Routers can be added and responds', (done) => {
@@ -47,17 +54,14 @@ describe('Behavior tests', () => {
     lvl5.use(lvl50Handle);
     lvl4.use('best', lvl5);
 
-    const mockReq = { path: 'hello' };
     const mockRes = { result: [] };
-    zero.handle(mockReq, mockRes, () => {
+    zero.handle({ path: 'hello' }, mockRes, () => {
       expect(mockRes.result).toEqual(['0-0', '1-0', '1-1', '1-2', '2-0', '3-0']);
-      mockReq.path = 'hello.world';
       mockRes.result = [];
-      zero.handle(mockReq, mockRes, () => {
+      zero.handle({ path: 'hello.world' }, mockRes, () => {
         expect(mockRes.result).toEqual(['4-0', '4-1']);
-        mockReq.path = 'hello.world.best';
         mockRes.result = [];
-        zero.handle(mockReq, mockRes, () => {
+        zero.handle({ path: 'hello.world.best' }, mockRes, () => {
           expect(mockRes.result).toEqual(['5-0']);
           done();
         });
@@ -86,6 +90,158 @@ describe('Behavior tests', () => {
     const mockRes = { result: [] };
     zero.handle(mockReq, mockRes, () => {
       expect(mockRes.result).toEqual(['0-0', '1-2', '0-1']);
+      done();
+    });
+  });
+
+  test('Routers should use inherited layers from options', (done) => {
+    const options = {
+      sensitive: true,
+      strict: true,
+      delimiter: '.',
+      RouterClass: Router,
+      LayerClass: GetMethodLayer,
+    };
+    const zero = new Router(options);
+    const lvl0Handle = middlewareFactory('0-0');
+    zero.use('hello', lvl0Handle);
+
+    const [subrouter] = zero.stack;
+    const [layer] = subrouter.stack;
+    expect(subrouter).toBeInstanceOf(Router);
+    expect(layer).toBeInstanceOf(GetMethodLayer);
+
+    const mockRes = { result: [] };
+    zero.handle({ path: 'hello', method: 'POST' }, mockRes, () => {
+      expect(mockRes.result).toEqual([]);
+      mockRes.result = [];
+      zero.handle({ path: 'hello', method: 'GET' }, mockRes, () => {
+        expect(mockRes.result).toEqual(['0-0']);
+        done();
+      });
+    });
+  });
+
+  test('Routers should use inherited routers from options', (done) => {
+    const options = {
+      sensitive: true,
+      strict: true,
+      delimiter: '.',
+      RouterClass: MethodRouter,
+      LayerClass: Layer,
+    };
+    const zero = new MethodRouter(options);
+    const lvl0Handle = middlewareFactory('0-0');
+    const lvl1Handle = middlewareFactory('1-0');
+    zero.get('hello', lvl0Handle);
+    zero.post('hello', lvl1Handle);
+
+    const [subrouterGET, subrouterPOST] = zero.stack;
+    const [layerGet] = subrouterGET.stack;
+    expect(subrouterGET).toBeInstanceOf(MethodRouter);
+    expect(layerGet).toBeInstanceOf(GetMethodLayer);
+    const [layerPost] = subrouterPOST.stack;
+    expect(subrouterPOST).toBeInstanceOf(MethodRouter);
+    expect(layerPost).toBeInstanceOf(PostMethodLayer);
+
+    const mockRes = { result: [] };
+    zero.handle({ path: 'hello', method: 'POST' }, mockRes, () => {
+      expect(mockRes.result).toEqual(['1-0']);
+      mockRes.result = [];
+      zero.handle({ path: 'hello', method: 'GET' }, mockRes, () => {
+        expect(mockRes.result).toEqual(['0-0']);
+        done();
+      });
+    });
+  });
+
+  test('Router stop on router-exit event', (done) => {
+    const zero = new Router();
+    const lvl0Handle = middlewareFactory('0-0');
+    zero.use(lvl0Handle);
+
+    const lvl1 = new Router();
+    const lvl10Handle = middlewareFactory('1-0');
+    const lvl11Handle = (req, res, next) => next('router-exit');
+    const lvl12Handle = middlewareFactory('1-2');
+    lvl1.use(lvl10Handle, lvl11Handle, lvl12Handle);
+    zero.use(lvl1);
+
+    const lvl01Handle = middlewareFactory('0-1');
+    zero.use(lvl01Handle);
+
+    const mockReq = { path: '.' };
+    const mockRes = { result: [] };
+    zero.handle(mockReq, mockRes, () => {
+      expect(mockRes.result).toEqual(['0-0', '1-0', '0-1']);
+      done();
+    });
+  });
+
+  test('Routers propagate errors from their layers to the other layers', (done) => {
+    const zero = new Router();
+    const lvl0Handle = middlewareFactory('0-0');
+    zero.use(lvl0Handle);
+
+    const lvl1 = new Router();
+    const lvl10Handle = errorFactory('1-0');
+    const lvl11Handle = middlewareFactory('1-1');
+    const lvl12Handle = catchFactory('1-2');
+    lvl1.use(lvl10Handle, lvl11Handle, lvl12Handle);
+    zero.use(lvl1);
+
+    const lvl01Handle = middlewareFactory('0-1');
+    zero.use(lvl01Handle);
+
+    const mockReq = { path: '.' };
+    const mockRes = { result: [] };
+    zero.handle(mockReq, mockRes, () => {
+      expect(mockRes.result).toEqual(['0-0', '1-0', '1-2', '0-1']);
+      done();
+    });
+  });
+  test('Routers do not propagate errors from outside to their stack', (done) => {
+    const zero = new Router();
+    const lvl0Handle = errorFactory('0-0');
+    zero.use(lvl0Handle);
+
+    const lvl1 = new Router();
+    const lvl10Handle = middlewareFactory('1-0');
+    const lvl11Handle = middlewareFactory('1-1');
+    const lvl12Handle = catchFactory('1-2');
+    lvl1.use(lvl10Handle, lvl11Handle, lvl12Handle);
+    zero.use(lvl1);
+
+    const lvl01Handle = catchFactory('0-1');
+    zero.use(lvl01Handle);
+
+    const mockReq = { path: '.' };
+    const mockRes = { result: [] };
+    zero.handle(mockReq, mockRes, () => {
+      expect(mockRes.result).toEqual(['0-0', '0-1']);
+      done();
+    });
+  });
+
+  test('Router accepts "handled" event for an error', (done) => {
+    const zero = new Router();
+    const lvl0Handle = middlewareFactory('0-0');
+    zero.use(lvl0Handle);
+
+    const lvl1 = new Router();
+    const lvl10Handle = errorFactory('1-0');
+    const lvl11Handle = (err, req, res, next) => next('handled');
+    const lvl12Handle = middlewareFactory('1-2');
+    lvl1.use(lvl10Handle, lvl11Handle, lvl12Handle);
+    zero.use(lvl1);
+
+    const lvl01Handle = middlewareFactory('0-1');
+    zero.use(lvl01Handle);
+
+    const mockReq = { path: '.' };
+    const mockRes = { result: [] };
+    zero.handle(mockReq, mockRes, () => {
+      expect(mockRes.result).toEqual(['0-0', '1-0', '1-2', '0-1']);
       done();
     });
   });

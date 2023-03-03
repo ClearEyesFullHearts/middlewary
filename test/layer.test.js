@@ -4,8 +4,6 @@ const {
 
 const Layer = require('../src/layer');
 
-const { middlewareFactory } = require('./fixtures');
-
 describe('Layer tests', () => {
   test('Layers can be instantiated', () => {
     const layer = new Layer();
@@ -170,7 +168,7 @@ describe('Layer tests', () => {
     layer.path = '/';
     const originalError = new Error('original error');
     layer.use((err, req, next) => { throw new Error('error in test'); });
-    layer.handleError(new Error(), { path: '/' }, (err) => {
+    layer.handleError(originalError, { path: '/' }, (err) => {
       expect(err).toBeInstanceOf(Error);
       expect(err.message).toBe('error in test');
       done();

@@ -9,13 +9,14 @@ class Router extends Layer {
     sensitive: true,
     strict: true,
     delimiter: '.',
-    trimLeft: false,
+    RouterClass: Router,
+    LayerClass: Layer,
   }) {
     super(opts);
 
     this.options = opts;
     this.parent = undefined;
-    this.route = '.';
+    this.route = opts.delimiter;
 
     this.restore = (fn, obj, ...args) => {
       const props = new Array(args.length);
@@ -47,7 +48,7 @@ class Router extends Layer {
           : err;
 
         // signal to exit router
-        if (layerError === 'handler-exit') {
+        if (layerError === 'router-exit') {
           setImmediate(done, null);
           return;
         }
@@ -77,9 +78,8 @@ class Router extends Layer {
       return next;
     };
 
-    this.trim = (str) => {
+    this.trim = (str, both) => {
       const ch = this.options.delimiter;
-      const both = this.options.trimLeft;
       let start = 0;
       let end = str.length;
 
@@ -101,9 +101,12 @@ class Router extends Layer {
         const parentPath = this.parent.getLayerPath();
         if (parentPath && parentPath !== this.options.delimiter) {
           if (myPath) {
-            return this.trim(`${parentPath}${this.options.delimiter}${myPath}`);
+            return this.trim(`${parentPath}${this.options.delimiter}${this.trim(myPath, true)}`);
           }
           return this.trim(parentPath);
+        }
+        if (myPath) {
+          return this.trim(myPath, true);
         }
       }
       if (myPath) {
@@ -120,7 +123,7 @@ class Router extends Layer {
     if (Object.prototype.toString.call(first) === '[object String]') {
       // add new router
       debug(`Router creates a new router for route: ${first}`);
-      const subRouter = new Router(this.options);
+      const subRouter = new this.options.RouterClass(this.options);
       subRouter.route = first;
       subRouter.parent = this;
       subRouter.use(fns);
@@ -141,7 +144,7 @@ class Router extends Layer {
         this.stack.push(handle);
       } else {
         debug('Router creates a new layer');
-        const layer = new Layer(this.options);
+        const layer = new this.options.LayerClass(this.options);
         layer.path = this.getLayerPath();
         layer.use(handle);
         this.stack.push(layer);
