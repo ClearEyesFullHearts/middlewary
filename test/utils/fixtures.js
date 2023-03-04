@@ -15,6 +15,10 @@ module.exports = {
     res.result.push(val);
     next();
   },
+  catchAndThrowFactory: (val) => (err, req, res, next) => {
+    res.result.push(val);
+    next(err);
+  },
   GetMethodLayer,
   PostMethodLayer,
   MethodRouter,

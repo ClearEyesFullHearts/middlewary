@@ -179,12 +179,18 @@ class Router extends Layer {
     next();
   }
 
-  handleError(err, ...args) { // eslint-disable-line class-methods-use-this
-    // A router shouldn't propagate to its stack an error coming from outside
-    // Just send it back to the parent router stack.
-    debug('Router do not handle errors directly');
-    const out = args[args.length - 1];
-    setImmediate(out, err);
+  handleError(err, ...args) {
+    const [first] = args;
+    const out = args.pop();
+
+    const done = this.restore(out, first, 'next');
+
+    const next = this.getnext(done, ...args);
+
+    first.next = next;
+
+    debug('Router begins handling cycle');
+    next(err);
   }
 }
 

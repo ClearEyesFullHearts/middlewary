@@ -7,6 +7,7 @@ const {
   middlewareFactory,
   errorFactory,
   catchFactory,
+  catchAndThrowFactory,
   GetMethodLayer,
   MethodRouter,
   PostMethodLayer,
@@ -193,7 +194,7 @@ describe('Behavior tests', () => {
       done();
     });
   });
-  test('Routers do not propagate errors from outside to their stack', (done) => {
+  test('Routers do propagate errors from parents to their stack', (done) => {
     const zero = new Router();
     const lvl0Handle = errorFactory('0-0');
     zero.use(lvl0Handle);
@@ -201,7 +202,7 @@ describe('Behavior tests', () => {
     const lvl1 = new Router();
     const lvl10Handle = middlewareFactory('1-0');
     const lvl11Handle = middlewareFactory('1-1');
-    const lvl12Handle = catchFactory('1-2');
+    const lvl12Handle = catchAndThrowFactory('1-2');
     lvl1.use(lvl10Handle, lvl11Handle, lvl12Handle);
     zero.use(lvl1);
 
@@ -211,7 +212,7 @@ describe('Behavior tests', () => {
     const mockReq = { path: '.' };
     const mockRes = { result: [] };
     zero.handle(mockReq, mockRes, () => {
-      expect(mockRes.result).toEqual(['0-0', '0-1']);
+      expect(mockRes.result).toEqual(['0-0', '1-2', '0-1']);
       done();
     });
   });
