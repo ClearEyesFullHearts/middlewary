@@ -1,6 +1,6 @@
 {
   "name": "middlewary",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "utilies to add middleware functionalities to a project",
   "main": "index.js",
   "scripts": {
