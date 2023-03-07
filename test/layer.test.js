@@ -141,6 +141,16 @@ describe('Layer tests', () => {
     layer.use((err, req, next) => done());
     layer.handleError(new Error(), { path: '' }, () => { throw new Error(); });
   });
+  test('Layers set the request params from the path for error request', (done) => {
+    const layer = new Layer();
+    layer.path = 'topic.:type.:id';
+    layer.use((err, req, next) => {
+      expect(req.params.type).toBe('car');
+      expect(req.params.id).toBe('16');
+      done();
+    });
+    layer.handleError(new Error(), { path: 'topic.car.16' }, () => { throw new Error(); });
+  });
   test('Layers throws when error request has less than 3 arguments (err, req & next)', () => {
     const layer = new Layer();
     layer.path = '';

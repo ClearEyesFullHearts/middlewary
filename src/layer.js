@@ -141,6 +141,8 @@ class Layer {
       return;
     }
 
+    first.params = this.params;
+
     debug(`Layer ${this.name} is handling error`);
 
     try {
