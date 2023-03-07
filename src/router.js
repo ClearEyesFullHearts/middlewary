@@ -5,6 +5,17 @@ const Layer = require('./layer');
 const { slice } = Array.prototype;
 
 class Router extends Layer {
+  set parent(parentRooter) {
+    if (this.internalParent) {
+      throw new Error('Router can only have one parent');
+    }
+    this.internalParent = parentRooter;
+  }
+
+  get parent() {
+    return this.internalParent;
+  }
+
   constructor(opts) {
     super(opts);
 
@@ -17,7 +28,7 @@ class Router extends Layer {
       ...opts,
     };
 
-    this.parent = undefined;
+    this.internalParent = undefined;
     this.route = this.options.delimiter;
 
     this.restore = (fn, obj, ...args) => {
@@ -99,8 +110,8 @@ class Router extends Layer {
 
     this.getLayerPath = () => {
       const myPath = this.route;
-      if (this.parent instanceof Router) {
-        const parentPath = this.parent.getLayerPath();
+      if (this.internalParent instanceof Router) {
+        const parentPath = this.internalParent.getLayerPath();
         if (parentPath && parentPath !== this.options.delimiter) {
           if (myPath) {
             return this.trim(`${parentPath}${this.options.delimiter}${this.trim(myPath, true)}`);

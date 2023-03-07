@@ -36,6 +36,7 @@ describe('Router tests', () => {
     const subrouter = new Router();
 
     router.use(subrouter);
+    expect(subrouter.parent).toBe(router);
     expect(router.stack.length).toBe(1);
     expect(router.stack[0]).toBeInstanceOf(Router);
   });
@@ -198,5 +199,22 @@ describe('Router tests', () => {
     obj.next = 'alabama';
 
     myrestorefunction();
+  });
+
+  test('Router cannot have multiple parents', () => {
+    const root1 = new Router();
+    const root2 = new Router();
+    const root3 = new Router();
+    const subRooter = new Router();
+
+    root1.use(subRooter);
+
+    expect(() => {
+      root2.use(subRooter);
+    }).toThrow();
+
+    expect(() => {
+      subRooter.parent = root3;
+    }).toThrow();
   });
 });
